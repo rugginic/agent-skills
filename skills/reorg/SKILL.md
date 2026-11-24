@@ -19,11 +19,15 @@ Split mechanics, orchestration, and judgment cleanly:
 
 Never permanently delete files. Never read files flagged `credential_skipped` or unpack `archive_skipped`.
 
+## Defaults (bare invocation)
+
+`/reorg` with no arguments means: target = the current workspace folder; goal = full cleanup (clear consistent renames, exact-duplicate quarantine to `_Duplicates/`, and file/folder restructure); write mode = in-place move. Do not ask the owner for scope, layout, or mode up front. Run steps 1-4 end to end and stop only at the approval gate (step 5) with the plan table and tree preview. Arguments the owner does give (a path, "only dedupe", "only rename", `--copy`, a rules file, a layout hint) override these defaults.
+
 ## Workflow
 
 1. **Audit first (metadata only).**
    Run `python3 <skill-dir>/scripts/reorg.py audit <path>` (add `--hash` for exact duplicates, `--rules <path>` when the user provides a taxonomy/rules YAML — see `references/rules.example.yaml`).
-   Report counts, largest folders/files, empty folders, deep-nesting hotspots, duplicates, and any unsupported Drive native objects (e.g., My Maps, Forms). Agree with the owner on scope, layout, and write mode (in-place move default vs `--copy`, or inbox filing via `--into <dest>`) before reading content.
+   Report counts, largest folders/files, empty folders, deep-nesting hotspots, duplicates, and any unsupported Drive native objects (e.g., My Maps, Forms). Apply the defaults above unless the owner specified otherwise (`--copy` for additive mode, `--into <dest>` for inbox filing); proceed without asking.
 
 2. **Extract only when filenames/folders are insufficient.**
    Run `python3 <skill-dir>/scripts/reorg.py extract <path>` on the agreed scope (bounded by default to depth 3 and 100 files; widen flags only when the owner asks).
