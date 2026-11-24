@@ -1606,6 +1606,49 @@ def _dedupe_proposals(inv: dict[str, Any]) -> list[dict[str, Any]]:
     return proposals
 
 
+COSMETIC_GROUP_MIN = 3
+
+
+def _name_tokens(path: str) -> list[str]:
+    stem, _ = split_name_ext(os.path.basename(path), native=False)
+    return [t for t in re.split(r'[^0-9a-z]+', stem.lower()) if t]
+
+
+def cosmetic_addition(source: str, target: str) -> str | None:
+    """Return the words a rename only bolted onto the original name, or None.
+
+    A rename is cosmetic when the original name survives intact as a contiguous
+    run of tokens and the added tokens carry no digits (no date, number, or
+    reference): e.g. "IMG_8117" -> "Foto_IMG_8117".
+    """
+    old, new = _name_tokens(source), _name_tokens(target)
+    if not old or old == new or len(new) <= len(old):
+        return None
+    for i in range(len(new) - len(old) + 1):
+        if new[i:i + len(old)] == old:
+            extra = new[:i] + new[i + len(old):]
+            if extra and not any(ch.isdigit() for tok in extra for ch in tok):
+                return '_'.join(extra)
+            return None
+    return None
+
+
+def find_cosmetic_renames(ops: list[dict[str, Any]]) -> dict[str, list[str]]:
+    """Group planned ops by the generic words they only prepend/append.
+
+    Only groups of COSMETIC_GROUP_MIN or more count: one file gaining a
+    counterparty name is fine, a category word stamped on many files is not.
+    """
+    groups: dict[str, list[str]] = collections.defaultdict(list)
+    for op in ops:
+        if op.get('status') != 'planned' or op.get('collision_suffixed'):
+            continue
+        extra = cosmetic_addition(op['source'], op['target'])
+        if extra:
+            groups[extra].append(op['source'])
+    return {k: v for k, v in groups.items() if len(v) >= COSMETIC_GROUP_MIN}
+
+
 def build_plan(
     source_target: str,
     *,
@@ -1617,6 +1660,7 @@ def build_plan(
     mode: str = 'move',
     extra_excludes: list[str] | None = None,
     drive: DriveClient | None = None,
+    allow_cosmetic: bool = False,
 ) -> dict[str, Any]:
     require(mode in ('move', 'copy'), f'Invalid mode: {mode}')
     src_root = validate_root_safety(source_target)
@@ -1835,6 +1879,20 @@ def build_plan(
                 )
             else:
                 op['drive_target_name'] = tgt_display
+
+    if not allow_cosmetic:
+        cosmetic = find_cosmetic_renames(prelim)
+        if cosmetic:
+            lines = [
+                f'  "{extra}" added to {len(srcs)} names, e.g. {", ".join(srcs[:3])}'
+                for extra, srcs in sorted(cosmetic.items(), key=lambda kv: -len(kv[1]))
+            ]
+            raise ValueError(
+                'Cosmetic renames rejected: these targets only add generic words to the original '
+                'name (the folder already says that). Give each file a real name from its content '
+                '(date, type, counterparty, reference) or keep the original name unchanged. '
+                'Pass --allow-cosmetic only if the owner explicitly wants this.\n' + '\n'.join(lines)
+            )
 
     # File/folder conflict check across final targets and untouched destination files
     final_targets = {op['target'] for op in prelim if op['status'] == 'planned'}
@@ -2701,6 +2759,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_plan.add_argument('--output', help='Plan JSON output path (default: ~/.local/state/reorg/plan-<ts>.json)')
     p_plan.add_argument('--state-dir', help='Override state directory')
     p_plan.add_argument('--json', action='store_true', dest='as_json', help='Print plan JSON to stdout')
+    p_plan.add_argument('--allow-cosmetic', action='store_true',
+                        help='Allow renames that only add generic words to many original names')
 
     # validate
     p_val = sub.add_parser('validate', help='Re-validate an existing plan against safety, rules, drift, and conflicts.')
@@ -2782,6 +2842,7 @@ def main(argv: list[str] | None = None) -> int:
                 rules_path=args.rules,
                 mode=args.mode,
                 extra_excludes=args.exclude,
+                allow_cosmetic=args.allow_cosmetic,
             )
             out_path = args.output
             if not out_path:

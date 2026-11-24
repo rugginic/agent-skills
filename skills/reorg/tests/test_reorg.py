@@ -445,6 +445,29 @@ class TestPlanAndValidate(unittest.TestCase):
                     {'source': 'b.txt', 'target': 'Dir/file.txt'},
                 ])
 
+    def test_rejects_cosmetic_prefix_renames(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for n in ('IMG_8117.jpeg', 'IMG_8118.jpeg', 'Preventivo-37.pdf', 'scan.pdf'):
+                (root / n).write_text(n)
+            stamped = [
+                {'source': 'IMG_8117.jpeg', 'target': 'Foto/Foto_IMG_8117.jpeg'},
+                {'source': 'IMG_8118.jpeg', 'target': 'Foto/Foto_IMG_8118.jpeg'},
+                {'source': 'scan.pdf', 'target': 'Foto/Foto_scan.pdf'},
+            ]
+            with self.assertRaisesRegex(ValueError, r'Cosmetic renames rejected[\s\S]*"foto" added to 3'):
+                r.build_plan(str(root), proposals_list=stamped)
+            self.assertEqual(len(r.build_plan(str(root), proposals_list=stamped, allow_cosmetic=True)['operations']), 3)
+            # Real renames (dates/refs), plain moves, and a lone counterparty addition pass.
+            plan = r.build_plan(str(root), proposals_list=[
+                {'source': 'IMG_8117.jpeg', 'target': 'Foto/2026-06-14_Cucina_Demolizione_01.jpeg'},
+                {'source': 'IMG_8118.jpeg', 'target': 'Foto/IMG_8118.jpeg'},
+                {'source': 'Preventivo-37.pdf', 'target': 'Preventivi/Preventivo-37_Termoclima.pdf'},
+                {'source': 'scan.pdf', 'target': 'Docs/2026-05-05_scan.pdf'},
+            ])
+            self.assertEqual(len(plan['operations']), 4)
+            self.assertEqual(r.cosmetic_addition('Preventivo-37.pdf', 'Preventivo_Preventivo-37.pdf'), 'preventivo')
+
     def test_collision_suffixing_reserves_literals_and_untouched_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
