@@ -1,0 +1,20 @@
+{
+  "name": "rugginic-agent-skills",
+  "owner": {
+    "name": "Nicola Ruggiero"
+  },
+  "metadata": {
+    "description": "Reusable cross-harness skills for AI coding agents (Claude Code, Codex, OpenCode, Pi, Antigravity)."
+  },
+  "plugins": [
+    {
+      "name": "reorg",
+      "description": "Deterministic file organization, metadata audit, bounded extraction, duplicate quarantine, and undo for local folders, NAS mounts, and Google Drive.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/reorg"
+      ]
+    }
+  ]
+}

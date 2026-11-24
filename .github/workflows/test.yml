@@ -1,0 +1,25 @@
+name: Test Skills
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system and Python test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends poppler-utils
+          python3 -m pip install --no-cache-dir pyyaml
+
+      - name: Run reorg skill tests
+        run: python3 -B skills/reorg/tests/test_reorg.py -v

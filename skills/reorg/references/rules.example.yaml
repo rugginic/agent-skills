@@ -1,0 +1,38 @@
+# Optional external rules file for: reorg.py audit|plan|validate --rules rules.yaml
+# Placeholders supported in target templates:
+#   {name}   original filename (e.g., invoice_2026.pdf)
+#   {stem}   filename without extension (e.g., invoice_2026)
+#   {ext}    extension including dot (e.g., .pdf)
+#   {rel}    path below the matched prefix
+#   {parent} original parent folder path
+#   {year}   4-digit year inferred from path/filename or mtime
+
+ignore:
+  - "*.tmp"
+  - "*.part"
+  - "build/**"
+
+allowed_roots:
+  - Finance
+  - Documents
+  - Media
+  - Archive
+
+max_depth: 5
+
+rules:
+  - match: "Invoices/**"
+    target: "Finance/Invoices/{year}/{name}"
+    reason: "route invoices by year"
+
+  - match: "Receipts/*"
+    target: "Finance/Receipts/{year}/{name}"
+    reason: "route receipts by year"
+
+  - match: "Photos/**"
+    target: "Media/Photos/{year}/{rel}"
+    reason: "preserve album subfolders under year"
+
+  - match: "*.dmg"
+    action: skip
+    reason: "leave disk images untouched"
